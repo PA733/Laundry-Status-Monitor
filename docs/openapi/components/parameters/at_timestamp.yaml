@@ -1,0 +1,8 @@
+name: at
+in: query
+required: false
+description: An optional RFC3339 timestamp to retrieve historical status data.
+schema:
+  type: string
+  format: date-time
+  example: "2023-01-01T12:00:00Z"

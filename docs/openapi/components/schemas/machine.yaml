@@ -1,0 +1,74 @@
+type: object
+properties:
+  ID:
+    type: integer
+    description: Unique identifier for the machine.
+  DormID:
+    type: integer
+    description: Identifier for the dorm this machine belongs to.
+  DisplayName:
+    type: string
+    description: User-friendly name for the machine.
+    example: "Washer 01"
+  IMEI:
+    type: string
+    description: IMEI number of the machine's communication module.
+  DeviceID:
+    type: integer
+    description: Device ID of the machine.
+  FloorCode:
+    type: string
+    description: Code for the floor where the machine is located.
+  Floor:
+    type: integer
+    description: Floor number where the machine is located.
+  Seq:
+    type: integer
+    description: Sequence number of the machine on the floor.
+  CreatedAt:
+    type: string
+    format: date-time
+    description: Timestamp when the machine was first registered.
+  UpdatedAt:
+    type: string
+    format: date-time
+    description: Timestamp when the machine details were last updated.
+  state:
+    type: integer
+    description: The raw status code of the machine.
+  isAvailable:
+    type: boolean
+    description: Indicates if the machine is currently available for use.
+  message:
+    type: string
+    description: A human-readable status message.
+    example: "In Use"
+  timeRemaining:
+    type: integer
+    description: Remaining time for the current cycle in seconds.
+    example: 1800
+  finishTime:
+    type: string
+    format: date-time
+    nullable: true
+    description: The expected finish time of the current cycle.
+  observedAt:
+    type: string
+    format: date-time
+    description: The timestamp when this status was recorded.
+required:
+  - ID
+  - DormID
+  - DisplayName
+  - IMEI
+  - DeviceID
+  - FloorCode
+  - Floor
+  - Seq
+  - CreatedAt
+  - UpdatedAt
+  - state
+  - isAvailable
+  - message
+  - timeRemaining
+  - observedAt

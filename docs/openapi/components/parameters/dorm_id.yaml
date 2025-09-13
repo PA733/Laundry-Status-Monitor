@@ -1,0 +1,7 @@
+name: dorm_id
+in: path
+required: true
+description: The ID of the dormitory to retrieve machines for.
+schema:
+  type: integer
+  example: 1

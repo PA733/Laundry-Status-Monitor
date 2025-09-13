@@ -1,0 +1,64 @@
+get:
+  summary: Get machine status for a dormitory
+  description: Retrieves the status of all laundry machines within a specific dormitory.
+  tags:
+    - Machines
+  parameters:
+    - $ref: '../components/parameters/dorm_id.yaml'
+    - $ref: '../components/parameters/at_timestamp.yaml'
+  responses:
+    '200':
+      description: A list of machine statuses for the given dormitory.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '../components/schemas/machine.yaml'
+          examples:
+            success:
+              value:
+                - ID: 101
+                  DormID: 1
+                  DisplayName: "Washer 01"
+                  IMEI: "123456789012345"
+                  DeviceID: 9876
+                  FloorCode: "F1"
+                  Floor: 1
+                  Seq: 1
+                  CreatedAt: "2023-01-10T10:00:00Z"
+                  UpdatedAt: "2023-01-10T10:00:00Z"
+                  state: 2
+                  isAvailable: false
+                  message: "In Use"
+                  timeRemaining: 1800
+                  finishTime: "2023-01-15T14:30:00Z"
+                  observedAt: "2023-01-15T14:00:00Z"
+                - ID: 102
+                  DormID: 1
+                  DisplayName: "Dryer 02"
+                  IMEI: "543210987654321"
+                  DeviceID: 9877
+                  FloorCode: "F1"
+                  Floor: 1
+                  Seq: 2
+                  CreatedAt: "2023-01-10T10:05:00Z"
+                  UpdatedAt: "2023-01-10T10:05:00Z"
+                  state: 1
+                  isAvailable: true
+                  message: "Available"
+                  timeRemaining: 0
+                  finishTime: null
+                  observedAt: "2023-01-15T14:05:00Z"
+    '404':
+      description: Dormitory not found.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/error.yaml'
+    default:
+      description: Unexpected error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/error.yaml'

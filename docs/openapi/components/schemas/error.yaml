@@ -1,0 +1,12 @@
+type: object
+properties:
+  code:
+    type: integer
+    format: int32
+    description: The HTTP status code.
+  message:
+    type: string
+    description: A human-readable error message.
+required:
+  - code
+  - message
