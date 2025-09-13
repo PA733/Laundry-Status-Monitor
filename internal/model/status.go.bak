@@ -1,0 +1,34 @@
+package model
+
+import (
+	"time"
+
+	"gorm.io/datatypes"
+)
+
+// MachineStatusCurrent holds the latest reported status of a machine.
+type MachineStatusCurrent struct {
+	MachineID           int64 `gorm:"primaryKey"`
+	State               int   `gorm:"not null"`
+	EnableReserve       *bool
+	ReserveState        *int
+	LastMaintenanceTime *time.Time
+	FinishTime          *time.Time
+	ObservedAt          time.Time `gorm:"not null;index"`
+	UpdatedAt           time.Time `gorm:"not null"`
+}
+
+// MachineStatusEvent represents a historical record of a machine's status at a point in time.
+// This is a hypertable in TimescaleDB.
+type MachineStatusEvent struct {
+	ID                  int64     `gorm:"primaryKey"`
+	MachineID           int64     `gorm:"index;not null"`
+	ObservedAt          time.Time `gorm:"not null;index"`
+	State               int       `gorm:"not null"`
+	EnableReserve       *bool
+	ReserveState        *int
+	LastMaintenanceTime *time.Time
+	FinishTime          *time.Time
+	Raw                 datatypes.JSON `gorm:"type:jsonb"`
+	CreatedAt           time.Time      `gorm:"not null"`
+}

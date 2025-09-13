@@ -1,0 +1,26 @@
+package scraper
+
+// ApiItem represents a single device record from the upstream API.
+type ApiItem struct {
+	ID                  int64   `json:"id"`
+	Name                string  `json:"name"`
+	IMEI                string  `json:"imei"`
+	FloorCode           string  `json:"floorCode"`
+	State               int     `json:"state"`
+	EnableReserve       *bool   `json:"enableReserve"`
+	ReserveState        *int    `json:"reserveState"`
+	LastMaintenanceTime *string `json:"lastMaintenanceTime"`
+	FinishTime          *string `json:"finishTime"`
+	DeviceID            int64   `json:"deviceId"`
+}
+
+// ApiResponse models the top-level structure of the upstream API's response.
+type ApiResponse struct {
+	Code int `json:"code"`
+	Data struct {
+		Page     int       `json:"page"`
+		PageSize int       `json:"pageSize"`
+		Total    int       `json:"total"`
+		Items    []ApiItem `json:"items"`
+	} `json:"data"`
+}
