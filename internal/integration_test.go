@@ -46,6 +46,7 @@ func TestOccupancyLifecycle(t *testing.T) {
 			Timezone: "Asia/Shanghai", // Explicitly set timezone for consistency
 		},
 	}
+	mockConfig.WorkerPool.Size = 4
 
 	// 3. Mock server to simulate the API responses.
 	var requestCount int
@@ -166,6 +167,7 @@ func TestOccupancyHistoryScenarios(t *testing.T) {
 				Timezone: "Asia/Shanghai",
 			},
 		}
+		mockConfig.WorkerPool.Size = 4
 
 		var mockResponses [][]store.ApiItem
 		var currentResponseIndex int
@@ -218,7 +220,7 @@ func TestOccupancyHistoryScenarios(t *testing.T) {
 		// Cycle 1: Machine is occupied.
 		setResponses([][]store.ApiItem{
 			{{ID: 201, State: 2, Name: "A栋2-1"}}, // Occupied
-			{}, // Disappears
+			{},                                   // Disappears
 		})
 		scraperService.ScrapeOnce(context.Background())
 

@@ -14,13 +14,26 @@ This project is a backend service for monitoring the status of laundry machines 
 
 ## Architecture
 
-The system is designed with a modular architecture, consisting of a scraper, a database, and an API server.
+The application uses an event-driven architecture to decouple database transactions from the notification system. This ensures that updates to the database are fast and reliable, while notifications are handled asynchronously.
 
-*   **Scraper:** A Go service responsible for fetching and parsing the HTML from the laundry service page.
-*   **Database:** A PostgreSQL database to store dormitory, machine, and status information.
-*   **API Server:** A Go service providing HTTP endpoints to access the laundry data.
+When the scraper detects changes in machine status, it writes the updates to the database. Instead of directly sending notifications within the same transaction, the store identifies which machines have become idle and returns their IDs. The scraper then dispatches a notification job for each of these machines.
 
-For a more detailed breakdown of the architecture, please refer to [`ARCHITECTURE.md`](ARCHITECTURE.md).
+### Notification Worker Pool
+
+A dedicated worker pool, defined in [`internal/notification/worker.go`](internal/notification/worker.go:29), handles the asynchronous sending of push notifications. These workers listen for jobs, fetch the necessary subscription details for a given machine, and send the notifications.
+
+This approach helps manage concurrency, prevents database connection exhaustion by limiting the number of simultaneous notification tasks, and makes the system more resilient to notification delivery failures.
+
+### Configuration
+
+The number of concurrent notification workers can be configured in the [`config/config.yaml`](config/config.yaml:45) file:
+
+```yaml
+worker_pool:
+  size: 4
+```
+
+The `size` parameter controls how many notifications can be sent in parallel. Increasing this value can improve notification throughput but will also increase resource consumption (CPU and database connections).
 
 ## Getting Started
 
@@ -131,3 +144,26 @@ The application is configured using the [`config/config.yaml`](config/config.yam
         "UpdatedAt": "2025-09-01T03:28:15Z"
       }
     ]
+
+### 3. Create or Update Subscription
+
+*   **Description:** Creates or replaces a user's subscription for a dorm. This is an idempotent action.
+*   **Path:** `/subscriptions`
+*   **Method:** `PUT`
+*   **Request Body:**
+    ```json
+    {
+      "user_id": "user123",
+      "dorm_id": 1
+    }
+    ```
+*   **Success Response:**
+    *   **Code:** `204 No Content`
+*   **Error Response:**
+    *   **Code:** `400 Bad Request`
+    *   **Content:**
+        ```json
+        {
+          "error": "Invalid request body"
+        }
+        ```

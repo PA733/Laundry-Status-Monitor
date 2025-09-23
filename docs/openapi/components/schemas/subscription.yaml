@@ -1,0 +1,6 @@
+type: object
+properties:
+  subscribed_machines:
+    type: array
+    items:
+      type: integer

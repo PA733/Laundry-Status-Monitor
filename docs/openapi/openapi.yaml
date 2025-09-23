@@ -16,19 +16,33 @@ tags:
     description: Operations related to dormitories.
   - name: Machines
     description: Operations related to laundry machines.
+  - name: Subscriptions
+    description: Web push subscriptions
 paths:
   /dorms:
     $ref: './paths/dorms.yaml'
   /dorms/{dorm_id}/machines:
     $ref: './paths/machines.yaml'
+  /subscriptions:
+    $ref: './paths/subscriptions.yaml'
+  /vapid_public_key:
+    $ref: './paths/vapid.yaml'
 components:
   schemas:
     Dorm:
       $ref: './components/schemas/dorm.yaml'
     Machine:
       $ref: './components/schemas/machine.yaml'
+    Subscription:
+      $ref: './components/schemas/subscription.yaml'
+    SubscriptionCreate:
+      $ref: './components/schemas/subscription_create.yaml'
+    SubscriptionDelete:
+      $ref: './components/schemas/subscription_delete.yaml'
     Error:
       $ref: './components/schemas/error.yaml'
+    VAPIDKey:
+      $ref: './components/schemas/vapid_key.yaml'
   parameters:
     DormID:
       $ref: './components/parameters/dorm_id.yaml'

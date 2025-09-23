@@ -1,0 +1,46 @@
+get:
+  summary: "Get a subscription"
+  description: "Retrieves the list of machine IDs for a given subscription endpoint."
+  tags:
+    - Subscriptions
+  parameters:
+    - name: endpoint
+      in: query
+      required: true
+      schema:
+        type: string
+  responses:
+    '200':
+      description: "Successful response"
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/subscription.yaml'
+put:
+  summary: "Create or replace a subscription"
+  description: "Creates a new web push subscription or replaces an existing one."
+  tags:
+    - Subscriptions
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../components/schemas/subscription_create.yaml'
+  responses:
+    '201':
+      description: "Subscription created or replaced."
+delete:
+  summary: "Delete a subscription"
+  description: "Deletes an existing web push subscription."
+  tags:
+    - Subscriptions
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../components/schemas/subscription_delete.yaml'
+  responses:
+    '204':
+      description: "Subscription deleted successfully."

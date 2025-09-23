@@ -9,9 +9,24 @@ import (
 
 // Config represents the overall application configuration.
 type Config struct {
-	Server   ServerConfig   `yaml:"server"`
-	Scraper  ScraperConfig  `yaml:"scraper"`
-	Database DatabaseConfig `yaml:"database"`
+	Server     ServerConfig     `yaml:"server"`
+	Scraper    ScraperConfig    `yaml:"scraper"`
+	Database   DatabaseConfig   `yaml:"database"`
+	Push       PushConfig       `yaml:"push"`
+	WorkerPool WorkerPoolConfig `yaml:"worker_pool"`
+}
+
+// WorkerPoolConfig holds the configuration for the notification worker pool.
+type WorkerPoolConfig struct {
+	Size int `yaml:"size"`
+}
+
+// PushConfig holds the VAPID keys for web push notifications.
+type PushConfig struct {
+	PublicKey  string `yaml:"vapid_public_key"`
+	PrivateKey string `yaml:"vapid_private_key"`
+	Subject    string `yaml:"subject"`
+	TTL        int    `yaml:"ttl"`
 }
 
 // ServerConfig holds the server-related configuration.
@@ -73,6 +88,10 @@ func Load(path string) (*Config, error) {
 
 	if cfg.Scraper.Request.PageSize <= 0 {
 		cfg.Scraper.Request.PageSize = 100
+	}
+
+	if cfg.Push.TTL <= 0 {
+		cfg.Push.TTL = 3600
 	}
 
 	return &cfg, nil

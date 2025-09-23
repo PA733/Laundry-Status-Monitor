@@ -16,5 +16,6 @@ type Machine struct {
 	UpdatedAt   time.Time
 
 	// Associations
-	Dorm Dorm `gorm:"constraint:OnDelete:CASCADE"`
+	Dorm              Dorm                `gorm:"constraint:OnDelete:CASCADE"`
+	PushSubscriptions []*PushSubscription `gorm:"many2many:subscription_machine_mapping;"`
 }

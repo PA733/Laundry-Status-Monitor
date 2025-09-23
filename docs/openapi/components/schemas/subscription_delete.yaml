@@ -1,0 +1,8 @@
+
+type: object
+required:
+  - endpoint
+properties:
+  endpoint:
+    type: string
+    description: The endpoint URL of the push subscription to delete.

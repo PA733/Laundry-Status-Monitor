@@ -1,0 +1,8 @@
+type: object
+required:
+  - public_key
+properties:
+  public_key:
+    type: string
+    description: "The VAPID public key."
+    example: "BFz...="

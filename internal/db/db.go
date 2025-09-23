@@ -37,6 +37,7 @@ func Init(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 		&model.Machine{},
 		&model.OccupancyOpen{},
 		&model.OccupancyHistory{},
+		&model.PushSubscription{},
 	); err != nil {
 		return nil, fmt.Errorf("automigrate failed: %w", err)
 	}

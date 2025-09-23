@@ -12,14 +12,18 @@ import (
 	"time"
 
 	"laundry-status-backend/config"
+	"laundry-status-backend/internal/notification"
 	"laundry-status-backend/internal/store"
+
+	"github.com/SherClockHolmes/webpush-go"
 )
 
 // Service orchestrates the data scraping process. It now uses a Store for persistence.
 type Service struct {
-	cfg    *config.Config
-	store  store.Store
-	client *http.Client
+	cfg        *config.Config
+	store      store.Store
+	client     *http.Client
+	workerPool *notification.WorkerPool // New field for the worker pool
 }
 
 // NewService creates and initializes a new scraper service.
@@ -34,6 +38,17 @@ func NewService(cfg *config.Config, store store.Store) *Service {
 			transport = &http.Transport{Proxy: http.ProxyURL(proxyURL)}
 		}
 	}
+
+	webpushOptions := webpush.Options{
+		VAPIDPublicKey:  cfg.Push.PublicKey,
+		VAPIDPrivateKey: cfg.Push.PrivateKey,
+		Subscriber:      cfg.Push.Subject,
+		TTL:             cfg.Push.TTL,
+	}
+
+	// Initialize the worker pool
+	workerPool := notification.NewWorkerPool(cfg.WorkerPool.Size, store.DB(), &webpushOptions)
+
 	return &Service{
 		cfg:   cfg,
 		store: store,
@@ -41,6 +56,7 @@ func NewService(cfg *config.Config, store store.Store) *Service {
 			Transport: transport,
 			Timeout:   30 * time.Second,
 		},
+		workerPool: workerPool,
 	}
 }
 
@@ -71,6 +87,9 @@ func (s *Service) Run(ctx context.Context) {
 		return
 	}
 	log.Println("Starting scraper service...")
+
+	// Start the worker pool
+	s.workerPool.Start(ctx)
 
 	s.ScrapeOnce(ctx)
 
@@ -142,8 +161,17 @@ func (s *Service) ScrapeOnce(ctx context.Context) {
 	}
 
 	// Step 3: Delegate occupancy updates to the store layer
-	if err := s.store.UpdateOccupancy(ctx, now, allItems, s.getStateType); err != nil {
+	machineIDsToNotify, err := s.store.UpdateOccupancy(ctx, now, allItems, s.getStateType)
+	if err != nil {
 		log.Printf("Error processing occupancy changes: %v", err)
+	}
+
+	// Dispatch notification jobs to the worker pool
+	if len(machineIDsToNotify) > 0 {
+		log.Printf("Dispatching notifications for %d machines", len(machineIDsToNotify))
+		for _, machineID := range machineIDsToNotify {
+			s.workerPool.Dispatch(machineID)
+		}
 	}
 
 	log.Println("Scrape cycle finished.")

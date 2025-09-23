@@ -3,17 +3,21 @@ package api
 import (
 	"time"
 
+	"github.com/SherClockHolmes/webpush-go"
 	"github.com/gin-gonic/gin"
 	"github.com/patrickmn/go-cache"
 	"golang.org/x/time/rate"
-	"gorm.io/gorm"
 
 	"laundry-status-backend/internal/mw"
+	"laundry-status-backend/internal/store"
 )
 
 // NewRouter creates and configures a new Gin router.
-func NewRouter(db *gorm.DB) *gin.Engine {
+func NewRouter(s store.Store, webpushOptions *webpush.Options) *gin.Engine {
 	r := gin.Default()
+
+	db := s.DB()
+	handler := NewHandler(s, webpushOptions)
 
 	// Initialize middleware
 	// Rate limit: 10 requests per second with a burst of 5
@@ -32,6 +36,12 @@ func NewRouter(db *gorm.DB) *gin.Engine {
 
 		// GET /api/dorms/{dorm_id}/machines
 		api.GET("/dorms/:dorm_id/machines", caching, GetMachineStatus(db))
+
+		// Add these lines inside the api.Use(rateLimiter) block
+		api.GET("/subscriptions", handler.GetSubscription)
+		api.PUT("/subscriptions", handler.PutSubscription)
+		api.DELETE("/subscriptions", handler.DeleteSubscription)
+		api.GET("/vapid_public_key", handler.GetVAPIDPublicKey)
 	}
 
 	return r

@@ -1,0 +1,16 @@
+type: object
+properties:
+  endpoint:
+    type: string
+    description: The endpoint URL for the push subscription.
+  p256dh:
+    type: string
+    description: The P-256 DH key for the subscription.
+  auth:
+    type: string
+    description: The authentication secret for the subscription.
+  subscribed_machines:
+    type: array
+    items:
+      type: integer
+    description: A list of machine IDs to subscribe to.

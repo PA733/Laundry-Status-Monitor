@@ -16,6 +16,8 @@ import (
 	"laundry-status-backend/internal/db"
 	"laundry-status-backend/internal/scraper"
 	"laundry-status-backend/internal/store" // <- New import
+
+	"github.com/SherClockHolmes/webpush-go"
 )
 
 func main() {
@@ -33,6 +35,18 @@ func main() {
 		logger.Fatalf("failed to load configuration from %s: %v", configPath, err)
 	}
 	logger.Printf("configuration loaded successfully from %s", configPath)
+
+	// Check for VAPID keys
+	if cfg.Push.PublicKey == "" || cfg.Push.PrivateKey == "" {
+		logger.Fatalf("VAPID keys must be configured. Please generate them and add them to your config file.")
+	}
+
+	webpushOptions := webpush.Options{
+		VAPIDPublicKey:  cfg.Push.PublicKey,
+		VAPIDPrivateKey: cfg.Push.PrivateKey,
+		Subscriber:      cfg.Push.Subject,
+		TTL:             cfg.Push.TTL,
+	}
 
 	// Initialize database
 	gormDB, err := db.Init(&cfg.Database)
@@ -54,7 +68,7 @@ func main() {
 	go scraperSvc.Run(ctx)
 
 	// Initialize router
-	router := api.NewRouter(gormDB)
+	router := api.NewRouter(appStore, &webpushOptions)
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.Server.Port),
 		Handler: router,

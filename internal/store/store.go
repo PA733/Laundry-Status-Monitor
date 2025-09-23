@@ -16,7 +16,8 @@ import (
 // Store defines the interface for all database operations.
 type Store interface {
 	UpsertDormsAndMachines(ctx context.Context, items []ApiItem) error
-	UpdateOccupancy(ctx context.Context, now time.Time, items []ApiItem, getStateType func(int) MachineStateType) error
+	UpdateOccupancy(ctx context.Context, now time.Time, items []ApiItem, getStateType func(int) MachineStateType) ([]int64, error)
+	DB() *gorm.DB
 }
 
 // gormStore implements the Store interface using GORM.
@@ -26,14 +27,22 @@ type gormStore struct {
 
 // NewGormStore creates a new GORM-backed store.
 func NewGormStore(db *gorm.DB) Store {
-	return &gormStore{db: db}
+	return &gormStore{
+		db: db,
+	}
+}
+
+// DB returns the underlying database connection.
+func (s *gormStore) DB() *gorm.DB {
+	return s.db
 }
 
 // UpdateOccupancy processes state changes and updates the database transactionally.
-func (s *gormStore) UpdateOccupancy(ctx context.Context, now time.Time, allItems []ApiItem, getStateType func(int) MachineStateType) error {
+func (s *gormStore) UpdateOccupancy(ctx context.Context, now time.Time, allItems []ApiItem, getStateType func(int) MachineStateType) ([]int64, error) {
+	var machineIDsToNotify []int64
 	currentOpenRecords, err := s.fetchAllOpenOccupancies(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to fetch open occupancy records: %w", err)
+		return nil, fmt.Errorf("failed to fetch open occupancy records: %w", err)
 	}
 
 	latestDataMap := make(map[int64]ApiItem)
@@ -41,7 +50,7 @@ func (s *gormStore) UpdateOccupancy(ctx context.Context, now time.Time, allItems
 		latestDataMap[item.ID] = item
 	}
 
-	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Process each machine from the latest API data.
 		for _, machineData := range allItems {
 			oldRecord, exists := currentOpenRecords[machineData.ID]
@@ -55,6 +64,9 @@ func (s *gormStore) UpdateOccupancy(ctx context.Context, now time.Time, allItems
 
 					// 判断新状态
 					if getStateType(machineData.State) == StateTypeIdle {
+						// The machine is now idle. Add to notification list.
+						machineIDsToNotify = append(machineIDsToNotify, oldRecord.MachineID)
+
 						// 如果新状态是 Idle，则从 open 表中删除该记录
 						if err := tx.Delete(&model.OccupancyOpen{}, oldRecord.MachineID).Error; err != nil {
 							return fmt.Errorf("failed to delete open occupancy record for machine %d: %w", oldRecord.MachineID, err)
@@ -91,6 +103,7 @@ func (s *gormStore) UpdateOccupancy(ctx context.Context, now time.Time, allItems
 		}
 		return nil
 	})
+	return machineIDsToNotify, err
 }
 
 // archiveRecord creates a historical record of a completed machine state.

@@ -1,0 +1,18 @@
+get:
+  summary: "Get VAPID Public Key"
+  description: "Retrieves the VAPID public key needed to create a push subscription."
+  tags:
+    - Subscriptions
+  responses:
+    '200':
+      description: "Successfully retrieved the VAPID public key."
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/vapid_key.yaml'
+    '503':
+      description: "Service Unavailable. The VAPID key is not configured on the server."
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/error.yaml'
