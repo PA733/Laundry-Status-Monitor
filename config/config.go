@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log"
 	"os"
 	"time"
 
@@ -92,6 +93,11 @@ func Load(path string) (*Config, error) {
 
 	if cfg.Push.TTL <= 0 {
 		cfg.Push.TTL = 3600
+	}
+
+	if cfg.WorkerPool.Size <= 0 {
+		log.Printf("worker_pool.size is not set or invalid; defaulting to 1")
+		cfg.WorkerPool.Size = 1
 	}
 
 	return &cfg, nil
