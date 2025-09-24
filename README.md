@@ -1,169 +1,98 @@
-# Laundry Status Monitoring Backend
+# 洗衣机状态监控后端 使用说明书
 
-## Project Overview
+> 请仔细阅读本说明书并在当地律师的指导下使用。
 
-This project is a backend service for monitoring the status of laundry machines in university dormitories. It scrapes data from the official laundry service page, stores it, and exposes it through a RESTful API. This allows for the development of third-party applications, such as mobile apps or widgets, to provide students with real-time laundry availability.
+**【通用名称】**  
+洗衣机状态监控后端
 
-## Features
+**【英文名称】**  
+Laundry Status Monitor
 
-*   **Status Scraping:** Periodically scrapes the laundry service website to get the latest status of all machines.
-*   **Historical Data:** Stores historical status data in a database for potential future analysis.
-*   **RESTful API:** Provides simple API endpoints to query laundry status.
-*   **Dockerized:** The entire application is containerized with Docker for easy setup and deployment.
-*   **Configurable:** Key parameters like scraping interval and database credentials can be configured via a `config.yaml` file.
+**【适应症】**  
+主要用于缓解宿舍等公共洗衣房的两类常见不适：
 
-## Architecture
+1. 官方程序（海乐生活）找机器不便：全校设备堆叠于单一列表，检索与定位困难。
+2. 状态监控繁琐：官方程序预计可用时间不准确，需反复查看或手动设闹钟。
 
-The application uses an event-driven architecture to decouple database transactions from the notification system. This ensures that updates to the database are fast and reliable, while notifications are handled asynchronously.
+**【成分】**  
 
-When the scraper detects changes in machine status, it writes the updates to the database. Instead of directly sending notifications within the same transaction, the store identifies which machines have become idle and returns their IDs. The scraper then dispatches a notification job for each of these machines.
+本品主要成分为 (Golang-Vue) B/S 前后端分离项目。  
+软件工程名称：(Golang-Vue) B/S 前后端分离项目  
+分子式：$Golang_1Vue_1$  
 
-### Notification Worker Pool
+**【性状】**  
+![](./docs/readme/preview.png)
+本品为一套可自托管的后端服务，提供设备发现、状态抓取、事件判定与 Web-Push 通知等功能；可单体运行，亦可与前端/其他服务协同服用。
 
-A dedicated worker pool, defined in [`internal/notification/worker.go`](internal/notification/worker.go:29), handles the asynchronous sending of push notifications. These workers listen for jobs, fetch the necessary subscription details for a given machine, and send the notifications.
+**【规格】**
 
-This approach helps manage concurrency, prevents database connection exhaustion by limiting the number of simultaneous notification tasks, and makes the system more resilient to notification delivery failures.
+- [x] 海乐生活 API 爬取
+- [x] 通知推送
+- [x] 洗衣机可用区间记录
+- [ ] 洗衣机历史状态查询
 
-### Configuration
+**【用法用量】**
 
-The number of concurrent notification workers can be configured in the [`config/config.yaml`](config/config.yaml:45) file:
+容器化或裸机部署均可。根据环境选择合适的进程管理与日志采集方案。  
+建议结合设备规模与平台限制进行配置，常见范围 *30–120 秒/轮*；频率过高可能触发风控。  
 
-```yaml
-worker_pool:
-  size: 4
+**【快速开始】**：
+
+  1. 配置目标校区/楼栋及设备筛选条件
+  2. 配置 Web-Push 需求的 VAPID 密钥对
+  3. 设置抓取频率与通知策略
+  4. 启动服务并观察日志、校验通知链路
+
+**【注意事项】**
+
+1. 合规与隐私：  
+   1\) 仅抓取设备公开状态，不采集个人敏感信息。  
+   2\) 请遵循平台的使用条款及当地法律。
+2. 监控稳定性。平台接口变更时需及时适配。
+
+**【不良反应】**  
+网络延迟愈高，不良反应愈明显。
+1. 常见的有漏报、延迟等网络波动反应，选用网络质量好的服务器可缓解。
+2. 接口一致性：目标平台 API 重大调整导致抓取中断。
+
+**【禁忌】**
+
+1. 不适用于未接入海乐生活平台的设备环境。
+2. 对秒级实时性极度敏感且无本地传感器补充的场景不建议仅依赖本品。
+
+**【相互作用】**
+
+尚不明确。
+
+**【药理机制】**  
+通过周期性抓取设备状态，结合规则/阈值识别关键事件，写入时间序列数据库形成“可用区间”，并通过 Web-Push 触达用户；可选前端用于空间可视化与历史观察。  
+
+**【技术路线】**  
+本项目为开发商学习 Web-Push 和 TimescaleDB 时的练手工程。  
+```mermaid
+flowchart LR
+    A([Web-Push]) --> C[洗衣机状态监控]
+    B([TimescaleDB]) --> C
+    C --> D([mapbox])
+    D --> E[充电桩监控]
+    E --> F([分布式])
+    E --> G([高可用])
+    E --> H([多渠道通知推送])
+    F --> I[统一课表平台]
+    G --> I
+    H --> I
 ```
 
-The `size` parameter controls how many notifications can be sent in parallel. Increasing this value can improve notification throughput but will also increase resource consumption (CPU and database connections).
+**【临床表现】**  
+示例站点：[https://laundry-status.bllxl.com](https://laundry-status.bllxl.com)
 
-## Getting Started
+**【储藏】**  
 
-### Prerequisites
+1. 定期备份数据库与配置；监控抓取成功率、推送送达率与告警量。
+2. 版本升级前在灰度环境回归关键路径；保留至少 7–14 天运行日志以便排查。
 
-*   [Docker](https://www.docker.com/get-started)
-*   [Docker Compose](https://docs.docker.com/compose/install/)
+**【执行标准】**  
+ISO 29110
 
-### Installation & Running
-
-1.  **Clone the repository:**
-    ```bash
-    git clone <repository-url>
-    cd status_backend_hapness_life
-    ```
-
-2.  **Configure the application:**
-    Copy the example configuration file and modify it if necessary.
-    ```bash
-    cp config/config.example.yaml config/config.yaml
-    ```
-    See the [Configuration](#configuration) section for details on the available options.
-
-3.  **Run with Docker Compose:**
-    This command will build the Go application, pull the PostgreSQL image, and start both services.
-    ```bash
-    docker-compose up --build
-    ```
-
-The API will be available at `http://localhost:8080`.
-
-## Configuration
-
-The application is configured using the [`config/config.yaml`](config/config.yaml:1) file.
-
-| Parameter          | Description                                                              | Default Value |
-| ------------------ | ------------------------------------------------------------------------ | ------------- |
-| `server.port`      | The port on which the API server will listen.                            | `8080`        |
-| `scraper.interval` | The interval in seconds at which the scraper fetches new data.           | `300`         |
-| `scraper.url`      | The URL of the laundry service page to scrape.                           |               |
-| `db.host`          | The hostname of the PostgreSQL database.                                 | `db`          |
-| `db.port`          | The port of the PostgreSQL database.                                     | `5432`        |
-| `db.user`          | The username for the PostgreSQL database.                                | `postgres`    |
-| `db.password`      | The password for the PostgreSQL database.                                | `postgres`    |
-| `db.dbname`        | The name of the database to use.                                         | `laundry`     |
-
-## API Endpoints
-
-### 1. Get All Dormitories
-
-*   **Description:** Retrieves a list of all dormitories and their associated laundry rooms.
-*   **Path:** `/dorms`
-*   **Method:** `GET`
-*   **Query Parameters:** None
-*   **Example Response:**
-    ```json
-    [
-      {
-        "ID": 1,
-        "Name": "Dormitory A",
-        "Location": "North Campus"
-      },
-      {
-        "ID": 2,
-        "Name": "Dormitory B",
-        "Location": "South Campus"
-      }
-    ]
-    ```
-
-### 2. Get Laundry Status
-
-*   **Description:** Retrieves the current status of all laundry machines, optionally filtered by dormitory ID.
-*   **Path:** `/status`
-*   **Method:** `GET`
-*   **Query Parameters:**
-    *   `dorm_id` (optional, integer): The ID of the dormitory to filter by.
-*   **Example Response (without filter):**
-    ```json
-    [
-      {
-        "MachineID": 101,
-        "DormID": 1,
-        "Status": "available",
-        "UpdatedAt": "2025-09-01T03:30:00Z"
-      },
-      {
-        "MachineID": 102,
-        "DormID": 1,
-        "Status": "in_use",
-        "UpdatedAt": "2025-09-01T03:28:15Z"
-      }
-    ]
-    ```
-*   **Example Response (with `?dorm_id=1`):**
-    ```json
-    [
-      {
-        "MachineID": 101,
-        "DormID": 1,
-        "Status": "available",
-        "UpdatedAt": "2025-09-01T03:30:00Z"
-      },
-      {
-        "MachineID": 102,
-        "DormID": 1,
-        "Status": "in_use",
-        "UpdatedAt": "2025-09-01T03:28:15Z"
-      }
-    ]
-
-### 3. Create or Update Subscription
-
-*   **Description:** Creates or replaces a user's subscription for a dorm. This is an idempotent action.
-*   **Path:** `/subscriptions`
-*   **Method:** `PUT`
-*   **Request Body:**
-    ```json
-    {
-      "user_id": "user123",
-      "dorm_id": 1
-    }
-    ```
-*   **Success Response:**
-    *   **Code:** `204 No Content`
-*   **Error Response:**
-    *   **Code:** `400 Bad Request`
-    *   **Content:**
-        ```json
-        {
-          "error": "Invalid request body"
-        }
-        ```
+**【规格与包装】**  
+以源码形式发布。
