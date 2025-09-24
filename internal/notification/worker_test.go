@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -102,6 +103,10 @@ func TestWorkerPool_WorkerLogic(t *testing.T) {
 			WithArgs(machineID, 1).
 			WillReturnRows(sqlmock.NewRows([]string{"display_name"}).AddRow("Washing Machine 101"))
 
+		mock.ExpectExec(`DELETE FROM subscription_machine_mapping WHERE push_subscription_endpoint = \$1`).
+			WithArgs(subscription.Endpoint).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+
 		wp.Dispatch(machineID)
 		wg.Wait()
 		assert.NoError(t, mock.ExpectationsWereMet())
@@ -138,6 +143,10 @@ func TestWorkerPool_WorkerLogic(t *testing.T) {
 		mock.ExpectQuery(`SELECT "display_name" FROM "machines" WHERE "machines"."id" = \$1 ORDER BY "machines"."id" LIMIT \$[0-9]+`).
 			WithArgs(machineID, 1).
 			WillReturnRows(sqlmock.NewRows([]string{"display_name"}).AddRow("Machine 102"))
+
+		mock.ExpectExec(`DELETE FROM subscription_machine_mapping WHERE push_subscription_endpoint = \$1`).
+			WithArgs(subscription.Endpoint).
+			WillReturnResult(sqlmock.NewResult(0, 1))
 
 		// Expect the delete operation
 		mock.ExpectBegin()
@@ -187,8 +196,66 @@ func TestWorkerPool_WorkerLogic(t *testing.T) {
 			WithArgs(machineID, 1).
 			WillReturnError(fmt.Errorf("machine not found"))
 
+		mock.ExpectExec(`DELETE FROM subscription_machine_mapping WHERE push_subscription_endpoint = \$1`).
+			WithArgs(subscription.Endpoint).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+
 		wp.Dispatch(machineID)
 		wg.Wait()
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
+}
+
+func TestWorkerPool_SkipsDuplicateEndpointNotifications(t *testing.T) {
+	gormDB, mock := newTestDB(t)
+	wp := NewWorkerPool(2, gormDB, &webpush.Options{})
+
+	subscription := model.PushSubscription{
+		Endpoint: "https://example.com/push",
+		P256DH:   "test_p256dh",
+		Auth:     "test_auth",
+	}
+
+	var sendCount int32
+	blockCh := make(chan struct{})
+
+	wp.sender = &mockSender{
+		SendFunc: func(payload []byte, sub *webpush.Subscription, options *webpush.Options) (*http.Response, error) {
+			atomic.AddInt32(&sendCount, 1)
+			<-blockCh
+			return &http.Response{
+				StatusCode: http.StatusCreated,
+				Body:       ioutil.NopCloser(bytes.NewBufferString("")),
+			}, nil
+		},
+	}
+
+	mock.ExpectExec(`DELETE FROM subscription_machine_mapping WHERE push_subscription_endpoint = \$1`).
+		WithArgs(subscription.Endpoint).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	ctx := context.Background()
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		wp.sendNotification(ctx, subscription, []byte("payload"))
+	}()
+
+	// Allow the first goroutine to acquire the guard before starting the second.
+	time.Sleep(10 * time.Millisecond)
+
+	go func() {
+		defer wg.Done()
+		wp.sendNotification(ctx, subscription, []byte("payload"))
+	}()
+
+	// Release the blocked sender so the first goroutine can finish.
+	close(blockCh)
+
+	wg.Wait()
+
+	assert.Equal(t, int32(1), atomic.LoadInt32(&sendCount), "expected exactly one notification to be sent")
+	assert.NoError(t, mock.ExpectationsWereMet())
 }

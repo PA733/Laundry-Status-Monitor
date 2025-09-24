@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 
 	"github.com/SherClockHolmes/webpush-go"
 	"gorm.io/gorm"
@@ -32,6 +33,7 @@ type WorkerPool struct {
 	db      *gorm.DB
 	webpush *webpush.Options
 	sender  NotificationSender
+	guard   *endpointGuard
 }
 
 // NewWorkerPool creates a new worker pool.
@@ -42,6 +44,7 @@ func NewWorkerPool(size int, db *gorm.DB, webpushOptions *webpush.Options) *Work
 		db:      db,
 		webpush: webpushOptions,
 		sender:  &WebPushSender{}, // Use the real sender by default
+		guard:   newEndpointGuard(),
 	}
 }
 
@@ -113,6 +116,12 @@ func (wp *WorkerPool) sendNotificationsForMachine(ctx context.Context, machineID
 
 // sendNotification sends a single web push notification.
 func (wp *WorkerPool) sendNotification(ctx context.Context, sub model.PushSubscription, payload []byte) {
+	if !wp.guard.Acquire(sub.Endpoint) {
+		log.Printf("Duplicate notification attempt for endpoint %s skipped", sub.Endpoint)
+		return
+	}
+	defer wp.guard.Release(sub.Endpoint)
+
 	// Manually construct the webpush.Subscription object
 	wpSub := &webpush.Subscription{
 		Endpoint: sub.Endpoint,
@@ -132,8 +141,51 @@ func (wp *WorkerPool) sendNotification(ctx context.Context, sub model.PushSubscr
 	// Handle expired subscriptions
 	if resp.StatusCode == 410 {
 		log.Printf("Subscription for endpoint %s is expired. Deleting.", sub.Endpoint)
+		if err := wp.clearEndpointSubscriptions(ctx, sub.Endpoint); err != nil {
+			log.Printf("Failed to clear subscriptions for endpoint %s: %v", sub.Endpoint, err)
+		}
 		if err := wp.db.WithContext(ctx).Delete(&sub).Error; err != nil {
 			log.Printf("Failed to delete expired subscription %s: %v", sub.Endpoint, err)
 		}
+		return
 	}
+
+	// Successful notification delivery should unsubscribe the endpoint from all machines.
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		if err := wp.clearEndpointSubscriptions(ctx, sub.Endpoint); err != nil {
+			log.Printf("Failed to clear subscriptions for endpoint %s after notification: %v", sub.Endpoint, err)
+		}
+	}
+}
+
+// clearEndpointSubscriptions removes all machine subscriptions associated with the given endpoint.
+func (wp *WorkerPool) clearEndpointSubscriptions(ctx context.Context, endpoint string) error {
+	return wp.db.WithContext(ctx).
+		Exec("DELETE FROM subscription_machine_mapping WHERE push_subscription_endpoint = ?", endpoint).
+		Error
+}
+
+type endpointGuard struct {
+	mu     sync.Mutex
+	active map[string]struct{}
+}
+
+func newEndpointGuard() *endpointGuard {
+	return &endpointGuard{active: make(map[string]struct{})}
+}
+
+func (g *endpointGuard) Acquire(endpoint string) bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if _, exists := g.active[endpoint]; exists {
+		return false
+	}
+	g.active[endpoint] = struct{}{}
+	return true
+}
+
+func (g *endpointGuard) Release(endpoint string) {
+	g.mu.Lock()
+	delete(g.active, endpoint)
+	g.mu.Unlock()
 }
